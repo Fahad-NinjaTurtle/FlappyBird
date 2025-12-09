@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flappy Bird</title>
+
+    <style>
+      #gameContainer {
+        position: relative;
+        width: 400px;
+        height: 500px;
+      }
+
+      #canvas {
+        border: 1px solid black;
+      }
+
+      #startBtn,
+      #restart {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        padding: 10px 20px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+
+      #restart{
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Flappy Bird</h1>
+
+    <div id="gameContainer">
+        <button id="startBtn">Start</button>
+        <button id="restart">Restart</button>
+      <canvas id="canvas" width="400" height="500"></canvas>
+    </div>
+    <script type="module" src="Scripts/inputHandler.js"></script>
+    <script type="module" src="Scripts/gameManager.js"></script>
+  </body>
+</html>
