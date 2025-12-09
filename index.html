@@ -2,18 +2,56 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>Flappy Bird</title>
+    <link rel="icon" type="image/x-icon" href="./Flappy Bird Asssets/favicon.ico">
 
     <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+      }
+
+      body {
+        background: linear-gradient(to bottom, #4ec0ca 0%, #87ceeb 100%);
+        font-family: Arial, sans-serif;
+      }
+
+      h1 {
+        display: none;
+      }
+
       #gameContainer {
-        position: relative;
-        width: 400px;
-        height: 500px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
       }
 
       #canvas {
-        border: 1px solid black;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        border: none;
+        touch-action: none;
+        display: block;
       }
 
       #startBtn,
@@ -22,14 +60,75 @@
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        z-index: 2;
-        padding: 10px 20px;
-        font-size: 18px;
+        z-index: 15;
+        padding: 12px 24px;
+        font-size: clamp(14px, 3vw, 18px);
         cursor: pointer;
+        background: #ff6b6b;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        transition: transform 0.1s;
+        font-weight: bold;
+        pointer-events: all;
       }
 
-      #restart{
+      #startBtn:hover,
+      #restart:hover {
+        transform: translate(-50%, -50%) scale(1.05);
+      }
+
+      #startBtn:active,
+      #restart:active {
+        transform: translate(-50%, -50%) scale(0.95);
+      }
+
+      #restart {
         display: none;
+      }
+
+      #startScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        pointer-events: all;
+      }
+
+      #gameOverScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        pointer-events: all;
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 16px;
+          padding: 4px;
+        }
+      }
+
+      @media (orientation: landscape) {
+        h1 {
+          display: none;
+        }
       }
     </style>
   </head>
@@ -37,11 +136,12 @@
     <h1>Flappy Bird</h1>
 
     <div id="gameContainer">
-        <button id="startBtn">Start</button>
-        <button id="restart">Restart</button>
-      <canvas id="canvas" width="400" height="500"></canvas>
+      <div id="startScreen"></div>
+      <div id="gameOverScreen"></div>
+      <!-- <button id="startBtn">Start</button> -->
+      <!-- <button id="restart">Restart</button> -->
+      <canvas id="canvas"></canvas>
     </div>
-    <script type="module" src="Scripts/inputHandler.js"></script>
     <script type="module" src="Scripts/gameManager.js"></script>
   </body>
 </html>

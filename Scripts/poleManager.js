@@ -1,100 +1,138 @@
 import { birdData } from "./birdManager.js";
-import { canvas, ctx } from "./canvas.js";
+import { ctx, GAME_WIDTH, GAME_HEIGHT } from "./canvas.js";
 import { IncrementScore } from "./gameManager.js";
-export const DrawPoles = () => {
-  ctx.fillStyle = "green";
-  MovePoles();
-  DrawTopPoles();
-  DrawBottomPole();
-};
-// let pole;
-// let poleX = canvas.width + 60;
-// let poleX = 60;
-// let poleHeight = Math.random() * 200;
-// let poleY = canvas.height - poleHeight;
-let poleWidth = 50;
+import { sprites } from "./assetLoader.js";
+
+const poleWidth = 52;
+// Minimum gap for bird to pass through (bird height 24px + safe buffer)
+const MIN_GAP = 180; // Increased gap to ensure bird can always pass
+const minPipeHeight = 50;
+const baseHeight = 100;
+const availableHeight = GAME_HEIGHT - baseHeight; // Height available for pipes
+const maxPipeHeight = availableHeight - MIN_GAP - minPipeHeight;
+
 export let poles = [];
 export let topPoles = [];
 const poleCount = 5;
-export const CreatePolesStructure = () => {
-  CreateTopPolesStructure();
-  CreateBottomPoleStructure();
-};
+const pipeSpeed = 2;
 
-const CreateBottomPoleStructure = () => {
-  for (let i = 0; i < poleCount; i++) {
-    let height = Math.random() * 100 + 130;
-
-    let top = canvas.height - height;
-
-    let left = canvas.width + i * 110; // spacing between poles
-
-    let poleObj = new Pole(left, top, poleWidth, height, false);
-    poles.push(poleObj);
+// Create a pipe pair with guaranteed minimum gap
+const createPipePair = (left) => {
+  // Choose a random gap center position (ensures gap is in playable area)
+  // Gap center should be between minPipeHeight + MIN_GAP/2 and availableHeight - minPipeHeight - MIN_GAP/2
+  const minGapCenter = minPipeHeight + MIN_GAP / 2;
+  const maxGapCenter = availableHeight - minPipeHeight - MIN_GAP / 2;
+  const gapCenter = Math.random() * (maxGapCenter - minGapCenter) + minGapCenter;
+  
+  // Calculate top pipe height (from 0 to gapCenter - MIN_GAP/2)
+  const topHeight = Math.max(gapCenter - MIN_GAP / 2, minPipeHeight);
+  
+  // Calculate bottom pipe (from gapCenter + MIN_GAP/2 to GAME_HEIGHT - baseHeight)
+  const bottomTop = gapCenter + MIN_GAP / 2;
+  const bottomHeight = (GAME_HEIGHT - baseHeight) - bottomTop;
+  
+  // Ensure bottom pipe also has minimum height
+  if (bottomHeight < minPipeHeight) {
+    // Adjust gap center if needed
+    const adjustedGapCenter = (GAME_HEIGHT - baseHeight) - minPipeHeight - MIN_GAP / 2;
+    const newTopHeight = Math.max(adjustedGapCenter - MIN_GAP / 2, minPipeHeight);
+    const newBottomTop = adjustedGapCenter + MIN_GAP / 2;
+    const newBottomHeight = (GAME_HEIGHT - baseHeight) - newBottomTop;
+    
+    // Create bottom pole
+    const bottomPole = new Pole(left, newBottomTop, poleWidth, newBottomHeight, false);
+    
+    // Create top pole
+    const topPole = new Pole(left, 0, poleWidth, newTopHeight, false);
+    
+    return { bottomPole, topPole };
   }
+  
+  // Create bottom pole
+  const bottomPole = new Pole(left, bottomTop, poleWidth, bottomHeight, false);
+  
+  // Create top pole
+  const topPole = new Pole(left, 0, poleWidth, topHeight, false);
+  
+  return { bottomPole, topPole };
 };
 
-const CreateTopPolesStructure = () => {
+export const CreatePolesStructure = () => {
+  poles.length = 0;
+  topPoles.length = 0;
+  
   for (let i = 0; i < poleCount; i++) {
-    let height = Math.random() * 100 + 130;
-
-    let top = 0;
-
-    let left = canvas.width + i * 110;
-    let poleObj = new Pole(left, top, poleWidth, height, false);
-    topPoles.push(poleObj);
+    const left = GAME_WIDTH + i * 200;
+    const { bottomPole, topPole } = createPipePair(left);
+    poles.push(bottomPole);
+    topPoles.push(topPole);
   }
 };
 
 const DrawTopPoles = () => {
-  for (let i = 0; i < poleCount; i++) {
-    ctx.fillRect(
-      topPoles[i].left,
-      topPoles[i].top,
-      topPoles[i].width,
-      topPoles[i].height
-    );
-    // console.log("drawn top poles are ", i);
+  if (!sprites.pipeGreen) return;
+  
+  for (let i = 0; i < topPoles.length; i++) {
+    let p = topPoles[i];
+    // Draw top pipe (flipped)
+    ctx.save();
+    ctx.translate(p.left + poleWidth / 2, p.height);
+    ctx.scale(1, -1); // Flip vertically
+    ctx.drawImage(sprites.pipeGreen, -poleWidth / 2, 0, poleWidth, p.height);
+    ctx.restore();
   }
 };
 
 const DrawBottomPole = () => {
-  for (let i = 0; i < poleCount; i++) {
-    //   pole = new Pole(poleX, poleY, poleWidth, poleHeight);
-    ctx.fillRect(poles[i].left, poles[i].top, poles[i].width, poles[i].height);
-    // console.log("drawn poles are ", i);
+  if (!sprites.pipeGreen) return;
+  
+  for (let i = 0; i < poles.length; i++) {
+    let p = poles[i];
+    ctx.drawImage(sprites.pipeGreen, p.left, p.top, poleWidth, p.height);
   }
+};
+
+export const DrawPoles = (isGameOver = false) => {
+  if (!isGameOver) {
+    MovePoles();
+  }
+  DrawTopPoles();
+  DrawBottomPole();
 };
 
 const MovePoles = () => {
   for (let i = 0; i < poles.length; i++) {
     let p = poles[i];
+    let t = topPoles[i];
 
-    p.left -= 2;
+    p.left -= pipeSpeed;
+    t.left -= pipeSpeed;
+    
     DetectBottomCrossed(p);
+    DetectTopCrossed(t);
+    
     if (p.left + p.width < 0) {
-      p.left = canvas.width + 100;
-      p.height = Math.random() * 100 + 130;
-      p.top = canvas.height - p.height;
+      // Reset pipe pair with guaranteed minimum gap
+      const left = GAME_WIDTH + 100;
+      const { bottomPole, topPole } = createPipePair(left);
+      
+      // Update bottom pole
+      p.height = bottomPole.height;
+      p.top = bottomPole.top;
+      p.left = left;
       p.isScored = false;
-    }
-  }
-  for (let i = 0; i < topPoles.length; i++) {
-    let p = topPoles[i];
-
-    p.left -= 2;
-    DetectTopCrossed(p);
-
-    if (p.left + p.width < 0) {
-      p.left = canvas.width + 100;
-      p.height = Math.random() * 100 + 130;
-      p.top = 0;
-      p.isScored = false;
+      
+      // Update top pole
+      t.height = topPole.height;
+      t.top = topPole.top;
+      t.left = left;
+      t.isScored = false;
     }
   }
 
   VerifyBothPolesCrossed();
 };
+
 export class Pole {
   constructor(left, top, width, height, isScored) {
     this.height = height;
