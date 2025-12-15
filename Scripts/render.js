@@ -25,7 +25,8 @@ const DrawBackground = (isGameOver = false) => {
   
   // Parallax scrolling background (only if game is not over)
   if (!isGameOver) {
-    backgroundX -= backgroundSpeed;
+    // Move background in same direction as pipes (left) using modulo tiling math
+    backgroundX += backgroundSpeed;
   }
   const bgWidth = sprites.background.width;
   
@@ -49,7 +50,8 @@ const DrawBase = (isGameOver = false) => {
   
   // Scrolling base/platform (only if game is not over)
   if (!isGameOver) {
-    baseX -= baseSpeed;
+    // Move ground in same direction as pipes (left) using modulo tiling math
+    baseX += baseSpeed;
   }
   const baseWidth = sprites.base.width;
   const baseHeight = 100;

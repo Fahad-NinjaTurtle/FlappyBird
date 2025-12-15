@@ -20,6 +20,32 @@ let gameStarted = false;
 let gameOver = false;
 let waitingToStart = true;
 export let score = 0;
+let bestScore = 0;
+
+const BEST_SCORE_KEY = "flappy_best_score";
+
+const loadBestScore = () => {
+  try {
+    const stored = localStorage.getItem(BEST_SCORE_KEY);
+    if (stored !== null) {
+      const parsed = parseInt(stored, 10);
+      if (!Number.isNaN(parsed) && parsed >= 0) {
+        bestScore = parsed;
+      }
+    }
+  } catch (e) {
+    // Fail silently if localStorage is blocked
+    bestScore = 0;
+  }
+};
+
+const saveBestScore = () => {
+  try {
+    localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+  } catch (e) {
+    // Ignore write errors (private mode, etc.)
+  }
+};
 
 const StartGame = () => {
   if (!waitingToStart) return;
@@ -98,72 +124,204 @@ const DrawStartScreen = () => {
 
 
 const DrawGameOverScreen = () => {
-  if (sprites.gameover) {
-    // Get original sprite dimensions to maintain aspect ratio
-    const originalWidth = sprites.gameover.width;
-    const originalHeight = sprites.gameover.height;
-    const aspectRatio = originalWidth / originalHeight;
-    
-    // Different sizing for mobile vs PC
-    let maxWidth, maxHeight;
-    if (isPC()) {
-      // PC: larger size
-      maxWidth = GAME_WIDTH * 0.6;
-      maxHeight = GAME_HEIGHT * 0.4;
-    } else {
-      // Mobile: smaller size (50% of screen width)
-      maxWidth = GAME_WIDTH * 0.5;
-      maxHeight = GAME_HEIGHT * 0.35;
-    }
-    
-    let gameOverWidth = maxWidth;
-    let gameOverHeight = gameOverWidth / aspectRatio;
-    
-    // If height exceeds max, scale by height instead
-    if (gameOverHeight > maxHeight) {
-      gameOverHeight = maxHeight;
-      gameOverWidth = gameOverHeight * aspectRatio;
-    }
-    
-    const gameOverY = (GAME_HEIGHT - gameOverHeight) / 2;
-    
-    // Draw final score above game over sprite
-    if (sprites.digits && sprites.digits.length > 0 && score > 0) {
-      const scoreStr = score.toString();
-      const digitWidth = 24;
-      const digitHeight = 36;
-      const spacing = 2;
-      const startX = (GAME_WIDTH - (scoreStr.length * (digitWidth + spacing))) / 2;
-      const startY = gameOverY - 50;
-      
-      for (let i = 0; i < scoreStr.length; i++) {
-        const digit = parseInt(scoreStr[i]);
-        if (sprites.digits[digit]) {
-          ctx.drawImage(
-            sprites.digits[digit],
-            startX + i * (digitWidth + spacing),
-            startY,
-            digitWidth,
-            digitHeight
-          );
+  // Responsive "GAME OVER" text + score summary rendered manually (no image)
+  const centerX = GAME_WIDTH / 2;
+
+  // Font sizes and spacing scale with device type
+  const desktop = isPC();
+  const baseGameOverFontSize = desktop
+    ? Math.min(40, Math.max(24, GAME_WIDTH * 0.09))
+    : Math.min(24, Math.max(16, GAME_WIDTH * 0.06)); // Smaller font for mobile
+  const baseLabelFontSize = desktop
+    ? Math.min(20, Math.max(12, GAME_WIDTH * 0.045))
+    : Math.min(14, Math.max(9, GAME_WIDTH * 0.035)); // Smaller label font for mobile
+
+  const lineGap = desktop ? 12 : 8; // Tighter spacing on mobile
+
+  // Starting Y - mobile needs more top padding to prevent cutoff
+  const gameOverY = desktop 
+    ? GAME_HEIGHT * 0.35 
+    : Math.max(60, GAME_HEIGHT * 0.25); // Ensure minimum 60px from top on mobile
+
+  const pixelFontStack = '"Press Start 2P", "Courier New", monospace';
+
+  // Calculate GAME OVER text Y position (mobile needs adjustment for "top" baseline)
+  const gameOverTextY = desktop ? gameOverY : gameOverY + baseGameOverFontSize / 2;
+
+  // --- GAME OVER text (as two words with adjustable spacing) ---
+  ctx.save();
+  ctx.textAlign = "left";
+  // Mobile: use "top" baseline to prevent cutoff, Desktop: use "middle" for better centering
+  ctx.textBaseline = desktop ? "middle" : "top";
+  ctx.font = `${baseGameOverFontSize}px ${pixelFontStack}`;
+  ctx.lineWidth = desktop ? 6 : 4; // Thinner outline on mobile
+  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ffa500";
+
+  const titleLeft = "GAME";
+  const titleRight = "OVER";
+  const gapBetweenWords = desktop
+    ? baseGameOverFontSize * 0.8
+    : baseGameOverFontSize * 0.9; // a bit more spacing on mobile
+
+  const leftWidth = ctx.measureText(titleLeft).width;
+  const rightWidth = ctx.measureText(titleRight).width;
+  const totalTitleWidth = leftWidth + gapBetweenWords + rightWidth;
+  const startX = centerX - totalTitleWidth / 2;
+
+  // Draw "GAME"
+  ctx.strokeText(titleLeft, startX, gameOverTextY);
+  ctx.fillText(titleLeft, startX, gameOverTextY);
+
+  // Draw "OVER" with extra spacing
+  const overX = startX + leftWidth + gapBetweenWords;
+  ctx.strokeText(titleRight, overX, gameOverTextY);
+  ctx.fillText(titleRight, overX, gameOverTextY);
+
+  ctx.restore();
+
+  // Digit metrics for score numbers (keep sprites look consistent)
+  // Slightly smaller digits on mobile so they don't dominate the UI
+  const digitWidth = desktop ? 24 : 18;
+  const digitHeight = desktop ? 36 : 27;
+  const spacing = 2;
+
+  // Helper to draw one score row (label + digits side‑by‑side, centered as a group) for desktop
+  const drawScoreRowDesktop = (labelText, value, rowY) => {
+    ctx.save();
+    ctx.font = `${baseLabelFontSize}px ${pixelFontStack}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 4;
+
+    const gap = Math.max(10, GAME_WIDTH * 0.03);
+    const labelWidth = ctx.measureText(labelText).width;
+
+    const valueStr = String(value);
+    const digitsWidth = valueStr.length * (digitWidth + spacing);
+
+    const totalWidth = labelWidth + gap + digitsWidth;
+    const startX = centerX - totalWidth / 2;
+
+    // Label
+    ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#ffa500";
+    ctx.strokeText(labelText, startX, rowY);
+    ctx.fillText(labelText, startX, rowY);
+
+    // Digits (sprites) drawn to the right of the label
+    if (sprites.digits && sprites.digits.length > 0) {
+      let digitX = startX + labelWidth + gap;
+      const digitY = rowY - digitHeight / 2;
+
+      for (let i = 0; i < valueStr.length; i++) {
+        const d = parseInt(valueStr[i]);
+        if (sprites.digits[d]) {
+          ctx.drawImage(sprites.digits[d], digitX, digitY, digitWidth, digitHeight);
+          digitX += digitWidth + spacing;
         }
       }
     }
-    
-    // Draw game over sprite with proper aspect ratio
-    ctx.drawImage(
-      sprites.gameover,
-      (GAME_WIDTH - gameOverWidth) / 2,
-      gameOverY,
-      gameOverWidth,
-      gameOverHeight
-    );
+
+    ctx.restore();
+  };
+
+  if (desktop) {
+    // --- Desktop: label and score side-by-side ---
+    const currentRowY = gameOverY + baseGameOverFontSize + lineGap * 2;
+    const highRowY = currentRowY + digitHeight + baseLabelFontSize + lineGap * 2;
+
+    drawScoreRowDesktop("CURRENT SCORE", score, currentRowY);
+    drawScoreRowDesktop("HIGH SCORE", bestScore, highRowY);
+
+    // Desktop: show tap-to-restart hint below scores
+    const tapFontSize = baseLabelFontSize * 0.8;
+    const tapY = highRowY + digitHeight + tapFontSize * 1.4;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${tapFontSize}px ${pixelFontStack}`;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText("TAP TO RESTART", centerX, tapY);
+    ctx.fillStyle = "#ffa500";
+    ctx.fillText("TAP TO RESTART", centerX, tapY);
+    ctx.restore();
+  } else {
+    // --- Mobile: label and score side-by-side (same as desktop, but with smaller spacing) ---
+    // Helper to draw one score row for mobile (label + digits side-by-side, centered as a group)
+    const drawScoreRowMobile = (labelText, value, rowY) => {
+      ctx.save();
+      ctx.font = `${baseLabelFontSize}px ${pixelFontStack}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; // Thinner outline on mobile
+
+      const gap = Math.max(6, GAME_WIDTH * 0.02); // Smaller gap on mobile
+      const labelWidth = ctx.measureText(labelText).width;
+
+      const valueStr = String(value);
+      const digitsWidth = valueStr.length * (digitWidth + spacing);
+
+      const totalWidth = labelWidth + gap + digitsWidth;
+      const startX = centerX - totalWidth / 2;
+
+      // Label
+      ctx.strokeStyle = "#ffffff";
+      ctx.fillStyle = "#ffa500";
+      ctx.strokeText(labelText, startX, rowY);
+      ctx.fillText(labelText, startX, rowY);
+
+      // Digits (sprites) drawn to the right of the label
+      if (sprites.digits && sprites.digits.length > 0) {
+        let digitX = startX + labelWidth + gap;
+        const digitY = rowY - digitHeight / 2;
+
+        for (let i = 0; i < valueStr.length; i++) {
+          const d = parseInt(valueStr[i]);
+          if (sprites.digits[d]) {
+            ctx.drawImage(sprites.digits[d], digitX, digitY, digitWidth, digitHeight);
+            digitX += digitWidth + spacing;
+          }
+        }
+      }
+
+      ctx.restore();
+    };
+
+    // Calculate row positions for mobile
+    // Add a bit more vertical space between GAME OVER and CURRENT SCORE on mobile
+    const currentRowY = gameOverTextY + baseGameOverFontSize + lineGap * 3;
+    const highRowY = currentRowY + Math.max(digitHeight, baseLabelFontSize) + lineGap * 1.5;
+
+    drawScoreRowMobile("CURRENT SCORE", score, currentRowY);
+    drawScoreRowMobile("HIGH SCORE", bestScore, highRowY);
+
+    // Mobile: show tap-to-restart hint below scores
+    const tapFontSize = baseLabelFontSize * 0.85;
+    const tapY = highRowY + digitHeight + tapFontSize * 1.4;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${tapFontSize}px ${pixelFontStack}`;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText("TAP TO RESTART", centerX, tapY);
+    ctx.fillStyle = "#ffa500";
+    ctx.fillText("TAP TO RESTART", centerX, tapY);
+    ctx.restore();
   }
 };
 
 export const IncrementScore = () => {
   score++;
   pointSound.play();
+  
+  // Update best score immediately when player scores higher
+  if (score > bestScore) {
+    bestScore = score;
+    saveBestScore();
+  }
 };
 
 export const GameOver = () => {
@@ -177,18 +335,22 @@ export const GameOver = () => {
 };
 
 const RestartGame = () => {
-  gameStarted = true;
+  // Reset to start panel instead of jumping directly into gameplay
+  gameStarted = false;
   gameOver = false;
-  waitingToStart = false;
+  waitingToStart = true;
   score = 0;
   // restartButton.style.display = "none";
   gameOverScreen.style.display = "none";
+  startScreen.style.display = "flex";
   poles.length = 0;
   topPoles.length = 0;
   RestoreBirdStatesToDefault();
   CreatePolesStructure();
   ResetScrolling();
   ResetCollisionCheck();
+  // Draw start panel again
+  Update();
 };
 
 const FPS = 60;
@@ -231,6 +393,8 @@ const handleInput = (e) => {
 const init = async () => {
   // Initial canvas resize
   resizeCanvas();
+  // Load best score from browser storage
+  loadBestScore();
   
   // Load assets
   const assetsLoaded = await loadAssets();

@@ -10,7 +10,8 @@ const birdRadius = 12; // Collision radius
 
 let velocity = 0;
 const gravity = 0.5;
-const jumpForce = 5;
+// Slightly stronger jump so it feels closer to original Flappy Bird
+const jumpForce = 7;
 
 // Animation variables
 let animationFrame = 1; // Start with midflap
